@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MonSuivi Emploi 🚀</title>
+<style>
+  :root{
+    --orange:#FF7A45;
+    --orange-dark:#E85D2C;
+    --yellow:#FFC542;
+    --green:#2EC4B6;
+    --purple:#7C5CFC;
+    --bg:#FFF8F0;
+    --card:#FFFFFF;
+    --text:#2D2A32;
+    --muted:#8A8594;
+    --radius:16px;
+    --shadow:0 8px 24px rgba(45,42,50,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    background:linear-gradient(135deg,#FFF8F0 0%, #FFEFE0 40%, #E9F9F6 100%);
+    color:var(--text);
+    min-height:100vh;
+  }
+  header{
+    padding:20px 24px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background:linear-gradient(90deg, var(--orange), var(--purple));
+    color:white;
+    box-shadow:var(--shadow);
+  }
+  header h1{margin:0; font-size:22px; display:flex; align-items:center; gap:10px;}
+  header .userbox{display:flex; align-items:center; gap:14px; font-size:14px;}
+  header button{
+    background:rgba(255,255,255,0.2);
+    border:1px solid rgba(255,255,255,0.5);
+    color:white;
+    padding:8px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    font-weight:600;
+    transition:.2s;
+  }
+  header button:hover{background:rgba(255,255,255,0.35);}
+
+  .container{max-width:1000px; margin:0 auto; padding:24px;}
+
+  /* AUTH */
+  .auth-wrap{
+    max-width:420px;
+    margin:60px auto;
+    background:var(--card);
+    padding:32px;
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+  .auth-wrap h2{margin-top:0; color:var(--orange-dark);}
+  .tabs{display:flex; margin-bottom:20px; border-radius:12px; overflow:hidden; background:#f0f0f0;}
+  .tabs button{
+    flex:1; padding:10px; border:none; background:transparent; cursor:pointer;
+    font-weight:600; color:var(--muted);
+  }
+  .tabs button.active{background:var(--orange); color:white;}
+
+  label{display:block; font-size:13px; font-weight:600; margin:10px 0 4px; color:var(--muted);}
+  input, select{
+    width:100%; padding:10px 12px; border-radius:10px; border:2px solid #eee;
+    font-size:14px; transition:.2s; background:#fff;
+  }
+  input:focus, select:focus{outline:none; border-color:var(--orange);}
+
+  .btn-primary{
+    margin-top:18px; width:100%; padding:12px; border:none; border-radius:12px;
+    background:linear-gradient(90deg, var(--orange), var(--purple));
+    color:white; font-weight:700; font-size:15px; cursor:pointer;
+    box-shadow:0 6px 16px rgba(255,122,69,0.35);
+    transition:.2s;
+  }
+  .btn-primary:hover{transform:translateY(-2px);}
+  .error-msg{color:#E63946; font-size:13px; margin-top:10px; min-height:16px;}
+
+  /* DASHBOARD */
+  .stats{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr));
+    gap:16px; margin-bottom:24px;
+  }
+  .stat-card{
+    background:var(--card); border-radius:var(--radius); padding:18px;
+    box-shadow:var(--shadow); text-align:center; border-top:5px solid var(--orange);
+  }
+  .stat-card.b{border-top-color:var(--purple);}
+  .stat-card.c{border-top-color:var(--green);}
+  .stat-card.d{border-top-color:var(--yellow);}
+  .stat-card .num{font-size:28px; font-weight:800;}
+  .stat-card .lbl{font-size:12px; color:var(--muted); font-weight:600;}
+
+  .section-title{display:flex; justify-content:space-between; align-items:center; margin:24px 0 12px;}
+  .section-title h2{margin:0; font-size:20px;}
+  .btn-add{
+    background:var(--green); color:white; border:none; padding:10px 18px;
+    border-radius:12px; font-weight:700; cursor:pointer; box-shadow:0 6px 16px rgba(46,196,182,0.35);
+  }
+
+  .card-form{
+    background:var(--card); border-radius:var(--radius); padding:22px; margin-bottom:20px;
+    box-shadow:var(--shadow); border-left:6px solid var(--purple);
+  }
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media(max-width:600px){.grid2{grid-template-columns:1fr;}}
+  fieldset{border:2px dashed #eee; border-radius:12px; padding:12px; margin-top:14px;}
+  legend{font-size:13px; font-weight:700; color:var(--muted); padding:0 6px;}
+
+  .entries{display:flex; flex-direction:column; gap:14px;}
+  .entry{
+    background:var(--card); border-radius:var(--radius); padding:18px 20px;
+    box-shadow:var(--shadow); display:flex; flex-wrap:wrap; gap:10px 20px;
+    align-items:center; justify-content:space-between; border-left:6px solid var(--orange);
+  }
+  .entry .main{flex:1; min-width:200px;}
+  .entry .entreprise{font-weight:800; font-size:16px;}
+  .entry .meta{font-size:13px; color:var(--muted); margin-top:2px;}
+  .badge{
+    display:inline-block; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:700;
+    color:white;
+  }
+  .badge.attente{background:var(--yellow); color:#7A5200;}
+  .badge.non{background:#E63946;}
+  .badge.entretien{background:var(--purple);}
+  .badge.oui{background:var(--green);}
+  .badge.relance-oui{background:var(--orange);}
+  .badge.relance-non{background:#ccc; color:#555;}
+
+  .entry .actions button{
+    background:none; border:none; cursor:pointer; font-size:16px; color:var(--muted);
+    padding:4px 8px;
+  }
+  .entry .actions button:hover{color:var(--orange-dark);}
+
+  .empty-state{
+    text-align:center; padding:50px 20px; color:var(--muted);
+    background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+  }
+  .empty-state .emoji{font-size:44px; margin-bottom:10px;}
+
+  .hidden{display:none !important;}
+  .week-tag{
+    background:var(--green); color:white; font-size:12px; font-weight:700;
+    padding:3px 10px; border-radius:20px; display:inline-block; margin-bottom:4px;
+  }
+  footer{text-align:center; padding:30px; color:var(--muted); font-size:13px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🚀 MonSuivi Emploi</h1>
+  <div class="userbox">
+    <span id="welcomeMsg"></span>
+    <button id="logoutBtn" class="hidden">Déconnexion</button>
+  </div>
+</header>
+
+<!-- AUTH SCREEN -->
+<div class="auth-wrap" id="authScreen">
+  <div class="tabs">
+    <button id="tabLogin" class="active">Connexion</button>
+    <button id="tabSignup">Créer un compte</button>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="loginForm">
+    <h2>Bon retour 👋</h2>
+    <label>Email</label>
+    <input type="email" id="loginEmail" placeholder="toi@exemple.com">
+    <label>Mot de passe</label>
+    <input type="password" id="loginPassword" placeholder="••••••••">
+    <button class="btn-primary" id="loginBtn">Se connecter</button>
+    <div class="error-msg" id="loginError"></div>
+  </div>
+
+  <!-- SIGNUP -->
+  <div id="signupForm" class="hidden">
+    <h2>Créer mon compte ✨</h2>
+    <div class="grid2">
+      <div>
+        <label>Prénom</label>
+        <input type="text" id="signupFirstname">
+      </div>
+      <div>
+        <label>Nom</label>
+        <input type="text" id="signupLastname">
+      </div>
+    </div>
+    <label>Date de naissance</label>
+    <input type="date" id="signupBirthdate">
+    <label>Email</label>
+    <input type="email" id="signupEmail">
+    <label>Mot de passe (6 caractères min.)</label>
+    <input type="password" id="signupPassword">
+    <button class="btn-primary" id="signupBtn">Créer mon compte</button>
+    <div class="error-msg" id="signupError"></div>
+  </div>
+</div>
+
+<!-- APP SCREEN -->
+<div class="container hidden" id="appScreen">
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="num" id="statTotal">0</div>
+      <div class="lbl">Démarches totales</div>
+    </div>
+    <div class="stat-card b">
+      <div class="num" id="statEntretien">0</div>
+      <div class="lbl">Entretiens</div>
+    </div>
+    <div class="stat-card c">
+      <div class="num" id="statOui">0</div>
+      <div class="lbl">Réponses positives</div>
+    </div>
+    <div class="stat-card d">
+      <div class="num" id="statAttente">0</div>
+      <div class="lbl">En attente</div>
+    </div>
+  </div>
+
+  <div class="section-title">
+    <h2>📋 Mes démarches</h2>
+    <button class="btn-add" id="showFormBtn">+ Ajouter une démarche</button>
+  </div>
+
+  <!-- FORM -->
+  <div class="card-form hidden" id="entryFormCard">
+    <div class="grid2">
+      <div>
+        <label>Nom de l'entreprise *</label>
+        <input type="text" id="fEntreprise" placeholder="Ex: Acme Corp">
+      </div>
+      <div>
+        <label>Téléphone de l'entreprise *</label>
+        <input type="tel" id="fTelEntreprise" placeholder="06 12 34 56 78">
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <label>Type de démarche *</label>
+        <select id="fType">
+          <option value="Dépôt de CV">Dépôt de CV</option>
+          <option value="Demande de stage">Demande de stage</option>
+          <option value="Demande d'alternance">Demande d'alternance</option>
+          <option value="Candidature spontanée">Candidature spontanée</option>
+          <option value="Réponse à une offre">Réponse à une offre</option>
+        </select>
+      </div>
+      <div>
+        <label>Réponse de l'entreprise *</label>
+        <select id="fReponse">
+          <option value="En attente">En attente</option>
+          <option value="Non">Non</option>
+          <option value="Entretien">Entretien</option>
+          <option value="Oui">Oui</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Relance effectuée ?</label>
+    <select id="fRelance">
+      <option value="Non">Non</option>
+      <option value="Oui">Oui</option>
+    </select>
+
+    <fieldset>
+      <legend>Responsable RH (facultatif)</legend>
+      <div class="grid2">
+        <div>
+          <label>Nom du responsable</label>
+          <input type="text" id="fRespNom">
+        </div>
+        <div>
+          <label>Téléphone du responsable</label>
+          <input type="tel" id="fRespTel">
+        </div>
+      </div>
+      <label>Email du responsable</label>
+      <input type="email" id="fRespEmail">
+    </fieldset>
+
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button class="btn-primary" id="saveEntryBtn" style="margin-top:0;">Enregistrer</button>
+      <button class="btn-primary" id="cancelEntryBtn" style="margin-top:0; background:#ccc; color:#333; box-shadow:none;">Annuler</button>
+    </div>
+    <div class="error-msg" id="formError"></div>
+  </div>
+
+  <div class="entries" id="entriesList"></div>
+  <div class="empty-state hidden" id="emptyState">
+    <div class="emoji">🗂️</div>
+    <p>Aucune démarche enregistrée pour le moment.<br>Clique sur "+ Ajouter une démarche" pour commencer !</p>
+  </div>
+
+</div>
+
+<footer>Fait avec 🧡 pour booster ta recherche d'emploi</footer>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, doc, setDoc, addDoc, collection, query, where,
+  onSnapshot, deleteDoc, serverTimestamp, orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ⚠️ Remplace ces valeurs par celles de TON projet Firebase (Paramètres du projet > Config web)
+const firebaseConfig = {
+  apiKey: "AIzaSyCwkWEDG1Mdk0V_Px1Ev8TqnCOUhWEpk9o",
+  authDomain: "monsuivi-3c42a.firebaseapp.com",
+  projectId: "monsuivi-3c42a",
+  storageBucket: "monsuivi-3c42a.firebasestorage.app",
+  messagingSenderId: "293651588161",
+  appId: "1:293651588161:web:5ea3616146f5413d9c12c0"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ---------- UI Elements ----------
+const authScreen = document.getElementById('authScreen');
+const appScreen = document.getElementById('appScreen');
+const welcomeMsg = document.getElementById('welcomeMsg');
+const logoutBtn = document.getElementById('logoutBtn');
+
+const tabLogin = document.getElementById('tabLogin');
+const tabSignup = document.getElementById('tabSignup');
+const loginForm = document.getElementById('loginForm');
+const signupForm = document.getElementById('signupForm');
+
+tabLogin.onclick = () => { tabLogin.classList.add('active'); tabSignup.classList.remove('active'); loginForm.classList.remove('hidden'); signupForm.classList.add('hidden'); };
+tabSignup.onclick = () => { tabSignup.classList.add('active'); tabLogin.classList.remove('active'); signupForm.classList.remove('hidden'); loginForm.classList.add('hidden'); };
+
+// ---------- Signup ----------
+document.getElementById('signupBtn').onclick = async () => {
+  const firstname = document.getElementById('signupFirstname').value.trim();
+  const lastname = document.getElementById('signupLastname').value.trim();
+  const birthdate = document.getElementById('signupBirthdate').value;
+  const email = document.getElementById('signupEmail').value.trim();
+  const password = document.getElementById('signupPassword').value;
+  const errEl = document.getElementById('signupError');
+  errEl.textContent = '';
+
+  if(!firstname || !lastname || !birthdate || !email || !password){
+    errEl.textContent = "Merci de remplir tous les champs.";
+    return;
+  }
+  try{
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await setDoc(doc(db, "users", cred.user.uid), {
+      firstname, lastname, birthdate, email, createdAt: serverTimestamp()
+    });
+  }catch(e){
+    errEl.textContent = translateError(e.code);
+  }
+};
+
+// ---------- Login ----------
+document.getElementById('loginBtn').onclick = async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  try{
+    await signInWithEmailAndPassword(auth, email, password);
+  }catch(e){
+    errEl.textContent = translateError(e.code);
+  }
+};
+
+logoutBtn.onclick = () => signOut(auth);
+
+function translateError(code){
+  const map = {
+    'auth/email-already-in-use': "Cet email est déjà utilisé.",
+    'auth/invalid-email': "Email invalide.",
+    'auth/weak-password': "Mot de passe trop faible (6 caractères min.).",
+    'auth/user-not-found': "Aucun compte avec cet email.",
+    'auth/wrong-password': "Mot de passe incorrect.",
+    'auth/invalid-credential': "Identifiants incorrects."
+  };
+  return map[code] || "Une erreur est survenue. Réessaie.";
+}
+
+// ---------- Auth state ----------
+let currentUserId = null;
+let unsubscribeEntries = null;
+
+onAuthStateChanged(auth, async (user) => {
+  if(user){
+    currentUserId = user.uid;
+    authScreen.classList.add('hidden');
+    appScreen.classList.remove('hidden');
+    logoutBtn.classList.remove('hidden');
+    welcomeMsg.textContent = user.email;
+    listenEntries();
+  } else {
+    currentUserId = null;
+    authScreen.classList.remove('hidden');
+    appScreen.classList.add('hidden');
+    logoutBtn.classList.add('hidden');
+    welcomeMsg.textContent = '';
+    if(unsubscribeEntries) unsubscribeEntries();
+  }
+});
+
+// ---------- Entry form ----------
+const showFormBtn = document.getElementById('showFormBtn');
+const entryFormCard = document.getElementById('entryFormCard');
+const cancelEntryBtn = document.getElementById('cancelEntryBtn');
+const saveEntryBtn = document.getElementById('saveEntryBtn');
+
+showFormBtn.onclick = () => entryFormCard.classList.remove('hidden');
+cancelEntryBtn.onclick = () => { entryFormCard.classList.add('hidden'); clearForm(); };
+
+function clearForm(){
+  document.getElementById('fEntreprise').value = '';
+  document.getElementById('fTelEntreprise').value = '';
+  document.getElementById('fType').value = 'Dépôt de CV';
+  document.getElementById('fReponse').value = 'En attente';
+  document.getElementById('fRelance').value = 'Non';
+  document.getElementById('fRespNom').value = '';
+  document.getElementById('fRespTel').value = '';
+  document.getElementById('fRespEmail').value = '';
+  document.getElementById('formError').textContent = '';
+}
+
+saveEntryBtn.onclick = async () => {
+  const entreprise = document.getElementById('fEntreprise').value.trim();
+  const telEntreprise = document.getElementById('fTelEntreprise').value.trim();
+  const type = document.getElementById('fType').value;
+  const reponse = document.getElementById('fReponse').value;
+  const relance = document.getElementById('fRelance').value;
+  const respNom = document.getElementById('fRespNom').value.trim();
+  const respTel = document.getElementById('fRespTel').value.trim();
+  const respEmail = document.getElementById('fRespEmail').value.trim();
+  const errEl = document.getElementById('formError');
+  errEl.textContent = '';
+
+  if(!entreprise || !telEntreprise){
+    errEl.textContent = "Le nom et le téléphone de l'entreprise sont obligatoires.";
+    return;
+  }
+
+  try{
+    await addDoc(collection(db, "entries"), {
+      userId: currentUserId,
+      entreprise, telEntreprise, type, reponse, relance,
+      respNom, respTel, respEmail,
+      createdAt: serverTimestamp()
+    });
+    entryFormCard.classList.add('hidden');
+    clearForm();
+  }catch(e){
+    errEl.textContent = "Erreur lors de l'enregistrement.";
+    console.error(e);
+  }
+};
+
+// ---------- Listen & render entries ----------
+function listenEntries(){
+  const q = query(collection(db, "entries"), where("userId", "==", currentUserId), orderBy("createdAt", "desc"));
+  unsubscribeEntries = onSnapshot(q, (snap) => {
+    const entries = [];
+    snap.forEach(d => entries.push({ id: d.id, ...d.data() }));
+    renderEntries(entries);
+    renderStats(entries);
+  });
+}
+
+function badgeClass(reponse){
+  const map = { 'En attente':'attente', 'Non':'non', 'Entretien':'entretien', 'Oui':'oui' };
+  return map[reponse] || 'attente';
+}
+
+function formatWeek(ts){
+  if(!ts || !ts.toDate) return '';
+  const d = ts.toDate();
+  const firstJan = new Date(d.getFullYear(),0,1);
+  const week = Math.ceil((((d - firstJan) / 86400000) + firstJan.getDay()+1)/7);
+  return `Semaine ${week} - ${d.getFullYear()}`;
+}
+
+function renderEntries(entries){
+  const list = document.getElementById('entriesList');
+  const empty = document.getElementById('emptyState');
+  list.innerHTML = '';
+  if(entries.length === 0){
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  entries.forEach(e => {
+    const div = document.createElement('div');
+    div.className = 'entry';
+    let respLine = '';
+    if(e.respNom || e.respTel || e.respEmail){
+      respLine = `<div class="meta">👤 ${e.respNom||'—'} ${e.respTel? '· 📞 '+e.respTel:''} ${e.respEmail? '· ✉️ '+e.respEmail:''}</div>`;
+    }
+    div.innerHTML = `
+      <div class="main">
+        <div class="week-tag">${formatWeek(e.createdAt)}</div>
+        <div class="entreprise">${escapeHtml(e.entreprise)}</div>
+        <div class="meta">📞 ${escapeHtml(e.telEntreprise)} · ${escapeHtml(e.type)}</div>
+        ${respLine}
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span class="badge ${badgeClass(e.reponse)}">${e.reponse}</span>
+        <span class="badge ${e.relance==='Oui'?'relance-oui':'relance-non'}">Relance: ${e.relance}</span>
+        <div class="actions">
+          <button title="Supprimer" onclick="window.deleteEntry('${e.id}')">🗑️</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function renderStats(entries){
+  document.getElementById('statTotal').textContent = entries.length;
+  document.getElementById('statEntretien').textContent = entries.filter(e=>e.reponse==='Entretien').length;
+  document.getElementById('statOui').textContent = entries.filter(e=>e.reponse==='Oui').length;
+  document.getElementById('statAttente').textContent = entries.filter(e=>e.reponse==='En attente').length;
+}
+
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+window.deleteEntry = async (id) => {
+  if(confirm('Supprimer cette démarche ?')){
+    await deleteDoc(doc(db, "entries", id));
+  }
+};
+</script>
+</body>
+</html>
