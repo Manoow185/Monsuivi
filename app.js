@@ -4,10 +4,9 @@ import {
   onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, doc, setDoc, addDoc, updateDoc, collection, query, where,
-  onSnapshot, deleteDoc, serverTimestamp
+  getFirestore, doc, setDoc, getDoc, addDoc, updateDoc, deleteDoc, collection, query, where,
+  onSnapshot, serverTimestamp, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
 // ⚠️ Remplace ces valeurs par celles de TON projet Firebase (Paramètres du projet > Config web)
 const firebaseConfig = {
   apiKey: "AIzaSyCwkWEDG1Mdk0V_Px1Ev8TqnCOUhWEpk9o",
@@ -25,6 +24,7 @@ const db = getFirestore(app);
 // ---------- UI Elements ----------
 const authScreen = document.getElementById('authScreen');
 const appScreen = document.getElementById('appScreen');
+const bannedScreen = document.getElementById('bannedScreen');
 const welcomeMsg = document.getElementById('welcomeMsg');
 const logoutBtn = document.getElementById('logoutBtn');
 
@@ -45,7 +45,6 @@ document.getElementById('signupBtn').onclick = async () => {
   const password = document.getElementById('signupPassword').value;
   const errEl = document.getElementById('signupError');
   errEl.textContent = '';
-
   if(!firstname || !lastname || !birthdate || !email || !password){
     errEl.textContent = "Merci de remplir tous les champs.";
     return;
@@ -53,7 +52,9 @@ document.getElementById('signupBtn').onclick = async () => {
   try{
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await setDoc(doc(db, "users", cred.user.uid), {
-      firstname, lastname, birthdate, email, createdAt: serverTimestamp()
+      firstname, lastname, birthdate, email,
+      role: "user", banned: false, referentId: null,
+      createdAt: serverTimestamp()
     });
   }catch(e){
     errEl.textContent = translateError(e.code);
@@ -89,20 +90,59 @@ function translateError(code){
 
 // ---------- Auth state ----------
 let currentUserId = null;
+let currentUserData = null;
 let unsubscribeEntries = null;
+
+const btnTabEntries = document.getElementById('btnTabEntries');
+const btnTabReferes = document.getElementById('btnTabReferes');
+const btnTabAdmin = document.getElementById('btnTabAdmin');
+const viewEntries = document.getElementById('viewEntries');
+const viewReferes = document.getElementById('viewReferes');
+const viewAdmin = document.getElementById('viewAdmin');
+
+function switchView(view){
+  [btnTabEntries, btnTabReferes, btnTabAdmin].forEach(b => b.classList.remove('active'));
+  [viewEntries, viewReferes, viewAdmin].forEach(v => v.classList.add('hidden'));
+  if(view === 'entries'){ btnTabEntries.classList.add('active'); viewEntries.classList.remove('hidden'); }
+  if(view === 'referes'){ btnTabReferes.classList.add('active'); viewReferes.classList.remove('hidden'); loadReferes(); }
+  if(view === 'admin'){ btnTabAdmin.classList.add('active'); viewAdmin.classList.remove('hidden'); loadAdmin(); }
+}
+btnTabEntries.onclick = () => switchView('entries');
+btnTabReferes.onclick = () => switchView('referes');
+btnTabAdmin.onclick = () => switchView('admin');
 
 onAuthStateChanged(auth, async (user) => {
   if(user){
+    const snap = await getDoc(doc(db, "users", user.uid));
+    const udata = snap.exists() ? snap.data() : { role:'user', banned:false };
+
+    if(udata.banned){
+      authScreen.classList.add('hidden');
+      appScreen.classList.add('hidden');
+      bannedScreen.classList.remove('hidden');
+      logoutBtn.classList.remove('hidden');
+      welcomeMsg.textContent = user.email;
+      return;
+    }
+
     currentUserId = user.uid;
+    currentUserData = udata;
     authScreen.classList.add('hidden');
+    bannedScreen.classList.add('hidden');
     appScreen.classList.remove('hidden');
     logoutBtn.classList.remove('hidden');
-    welcomeMsg.textContent = user.email;
+    welcomeMsg.textContent = `${udata.firstname || ''} (${user.email})`;
+
+    btnTabReferes.classList.toggle('hidden', udata.role !== 'referant');
+    btnTabAdmin.classList.toggle('hidden', udata.role !== 'admin');
+    switchView('entries');
     listenEntries();
   } else {
     currentUserId = null;
+    currentUserData = null;
     authScreen.classList.remove('hidden');
     appScreen.classList.add('hidden');
+    bannedScreen.classList.add('hidden');
     logoutBtn.classList.add('hidden');
     welcomeMsg.textContent = '';
     if(unsubscribeEntries) unsubscribeEntries();
@@ -117,7 +157,7 @@ const saveEntryBtn = document.getElementById('saveEntryBtn');
 
 cancelEntryBtn.onclick = () => { entryFormCard.classList.add('hidden'); clearForm(); };
 
-let editingId = null; // null = ajout, sinon id de la démarche en cours de modification
+let editingId = null;
 
 function nowDateTime(){
   const d = new Date();
@@ -139,6 +179,7 @@ function clearForm(){
   document.getElementById('fType').value = 'Dépôt de CV';
   document.getElementById('fReponse').value = 'En attente';
   document.getElementById('fRelance').value = 'Non';
+  document.getElementById('fComment').value = '';
   document.getElementById('fRespNom').value = '';
   document.getElementById('fRespTel').value = '';
   document.getElementById('fRespEmail').value = '';
@@ -158,6 +199,7 @@ saveEntryBtn.onclick = async () => {
   const respNom = document.getElementById('fRespNom').value.trim();
   const respTel = document.getElementById('fRespTel').value.trim();
   const respEmail = document.getElementById('fRespEmail').value.trim();
+  const comment = document.getElementById('fComment').value.trim();
   const errEl = document.getElementById('formError');
   errEl.textContent = '';
 
@@ -169,7 +211,7 @@ saveEntryBtn.onclick = async () => {
   const data = {
     userId: currentUserId,
     entreprise, telEntreprise, date, heure, type, reponse, relance,
-    respNom, respTel, respEmail
+    respNom, respTel, respEmail, comment
   };
 
   try{
@@ -187,8 +229,8 @@ saveEntryBtn.onclick = async () => {
   }
 };
 
-window.editEntry = (id, entries) => {
-  const e = entries.find(x => x.id === id);
+window.editEntry = (id) => {
+  const e = (window.__entries || []).find(x => x.id === id);
   if(!e) return;
   editingId = id;
   document.getElementById('formTitle').textContent = 'Modifier la démarche';
@@ -199,6 +241,7 @@ window.editEntry = (id, entries) => {
   document.getElementById('fType').value = e.type || 'Dépôt de CV';
   document.getElementById('fReponse').value = e.reponse || 'En attente';
   document.getElementById('fRelance').value = e.relance || 'Non';
+  document.getElementById('fComment').value = e.comment || '';
   document.getElementById('fRespNom').value = e.respNom || '';
   document.getElementById('fRespTel').value = e.respTel || '';
   document.getElementById('fRespEmail').value = e.respEmail || '';
@@ -207,19 +250,17 @@ window.editEntry = (id, entries) => {
   entryFormCard.scrollIntoView({ behavior:'smooth', block:'start' });
 };
 
-// ---------- Listen & render entries ----------
+// ---------- Listen & render entries (utilisateur courant) ----------
 function listenEntries(){
   const q = query(collection(db, "entries"), where("userId", "==", currentUserId));
   unsubscribeEntries = onSnapshot(q, (snap) => {
     const entries = [];
     snap.forEach(d => entries.push({ id: d.id, ...d.data() }));
-    // Tri du plus récent au plus ancien selon date + heure de la démarche
     entries.sort((a, b) => `${b.date||''} ${b.heure||''}`.localeCompare(`${a.date||''} ${a.heure||''}`));
-    renderEntries(entries);
+    window.__entries = entries;
+    renderEntries(entries, document.getElementById('entriesList'), document.getElementById('emptyState'), true);
     renderStats(entries);
-  }, (error) => {
-    console.error("Erreur de lecture des démarches :", error);
-  });
+  }, (error) => console.error("Erreur de lecture des démarches :", error));
 }
 
 function badgeClass(reponse){
@@ -242,15 +283,19 @@ function formatDateFr(dateStr){
   return `${d}/${m}/${y}`;
 }
 
-function renderEntries(entries){
-  const list = document.getElementById('entriesList');
-  const empty = document.getElementById('emptyState');
-  list.innerHTML = '';
+function escapeHtml(str){
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+function renderEntries(entries, listEl, emptyEl, editable, referantMode){
+  listEl.innerHTML = '';
   if(entries.length === 0){
-    empty.classList.remove('hidden');
+    if(emptyEl) emptyEl.classList.remove('hidden');
     return;
   }
-  empty.classList.add('hidden');
+  if(emptyEl) emptyEl.classList.add('hidden');
 
   entries.forEach(e => {
     const div = document.createElement('div');
@@ -259,25 +304,45 @@ function renderEntries(entries){
     if(e.respNom || e.respTel || e.respEmail){
       respLine = `<div class="meta">👤 ${e.respNom||'—'} ${e.respTel? '· 📞 '+e.respTel:''} ${e.respEmail? '· ✉️ '+e.respEmail:''}</div>`;
     }
+    let proofLine = '';
+    if(e.comment){
+      proofLine += `<div class="comment-box user-comment">💬 <strong>Toi :</strong> ${escapeHtml(e.comment)}</div>`;
+    }
+    if(e.referantComment){
+      proofLine += `<div class="comment-box">🗨️ <strong>Référant :</strong> ${escapeHtml(e.referantComment)}</div>`;
+    }
+    if(referantMode){
+      proofLine += `<div style="margin-top:8px;">
+        <textarea rows="2" placeholder="Ajouter un commentaire..." id="refComment_${e.id}">${escapeHtml(e.referantComment||'')}</textarea>
+        <button class="btn-secondary" style="margin-top:6px; padding:6px 12px; font-size:13px;" onclick="window.saveReferantComment('${e.id}')">💾 Enregistrer le commentaire</button>
+      </div>`;
+    }
+    const actions = editable
+      ? `<div class="actions">
+          <button title="Modifier" onclick='window.editEntry("${e.id}")'>✏️</button>
+          <button title="Supprimer" onclick="window.deleteEntry('${e.id}')">🗑️</button>
+        </div>`
+      : '';
+    const seenBadge = referantMode
+      ? `<span class="badge ${e.seen?'seen':'unseen'}" style="cursor:pointer;" onclick="window.toggleSeen('${e.id}', ${!!e.seen})">${e.seen?'✅ Vu':'👁️ Marquer vu'}</span>`
+      : (e.seen ? `<span class="badge seen">✅ Vu par le référant</span>` : '');
     div.innerHTML = `
       <div class="main">
         <div class="week-tag">${formatWeek(e.date)}</div>
         <div class="entreprise">${escapeHtml(e.entreprise)}</div>
         <div class="meta">📅 ${formatDateFr(e.date)} à ${escapeHtml(e.heure||'')} · 📞 ${escapeHtml(e.telEntreprise)} · ${escapeHtml(e.type)}</div>
         ${respLine}
+        ${proofLine}
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         <span class="badge ${badgeClass(e.reponse)}">${e.reponse}</span>
         <span class="badge ${e.relance==='Oui'?'relance-oui':'relance-non'}">Relance: ${e.relance}</span>
-        <div class="actions">
-          <button title="Modifier" onclick='window.editEntry("${e.id}", window.__entries)'>✏️</button>
-          <button title="Supprimer" onclick="window.deleteEntry('${e.id}')">🗑️</button>
-        </div>
+        ${seenBadge}
+        ${actions}
       </div>
     `;
-    list.appendChild(div);
+    listEl.appendChild(div);
   });
-  window.__entries = entries;
 }
 
 function renderStats(entries){
@@ -287,14 +352,113 @@ function renderStats(entries){
   document.getElementById('statAttente').textContent = entries.filter(e=>e.reponse==='En attente').length;
 }
 
-function escapeHtml(str){
-  const d = document.createElement('div');
-  d.textContent = str || '';
-  return d.innerHTML;
-}
-
 window.deleteEntry = async (id) => {
   if(confirm('Supprimer cette démarche ?')){
     await deleteDoc(doc(db, "entries", id));
   }
+};
+
+// ---------- VUE REFERANT : mes référés ----------
+async function loadReferes(){
+  const container = document.getElementById('referesList');
+  container.innerHTML = '<p class="meta">Chargement…</p>';
+  const usersSnap = await getDocs(query(collection(db, "users"), where("referentId","==", currentUserId)));
+  const users = [];
+  usersSnap.forEach(d => users.push({ id:d.id, ...d.data() }));
+
+  if(users.length === 0){
+    container.innerHTML = '<div class="empty-state"><div class="emoji">👥</div><p>Aucune personne ne t\'est encore affiliée.</p></div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  for(const u of users){
+    const entriesSnap = await getDocs(query(collection(db, "entries"), where("userId","==", u.id)));
+    const entries = [];
+    entriesSnap.forEach(d => entries.push({ id:d.id, ...d.data() }));
+    entries.sort((a,b) => `${b.date||''} ${b.heure||''}`.localeCompare(`${a.date||''} ${a.heure||''}`));
+
+    const block = document.createElement('div');
+    block.className = 'card-form';
+    block.innerHTML = `<h3 style="margin-top:0;">${escapeHtml(u.firstname)} ${escapeHtml(u.lastname)} <span class="meta">(${escapeHtml(u.email)})</span></h3>
+      <div class="meta" style="margin-bottom:10px;">🎂 Né(e) le ${u.birthdate || '—'} · ${entries.length} démarche(s)</div>
+      <div class="entries" id="refEntries_${u.id}"></div>`;
+    container.appendChild(block);
+    renderEntries(entries, block.querySelector(`#refEntries_${u.id}`), null, false, true);
+  }
+}
+
+window.toggleSeen = async (id, currentlySeen) => {
+  await updateDoc(doc(db, "entries", id), { seen: !currentlySeen });
+  loadReferes();
+};
+
+window.saveReferantComment = async (id) => {
+  const val = document.getElementById(`refComment_${id}`).value.trim();
+  await updateDoc(doc(db, "entries", id), { referantComment: val });
+  loadReferes();
+};
+
+// ---------- VUE ADMIN ----------
+async function loadAdmin(){
+  const container = document.getElementById('adminList');
+  container.innerHTML = '<p class="meta">Chargement…</p>';
+  const usersSnap = await getDocs(collection(db, "users"));
+  const users = [];
+  usersSnap.forEach(d => users.push({ id:d.id, ...d.data() }));
+  const referants = users.filter(u => u.role === 'referant');
+
+  container.innerHTML = '';
+  users.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'entry';
+    const roleOptions = ['user','referant','admin'].map(r =>
+      `<option value="${r}" ${u.role===r?'selected':''}>${r}</option>`).join('');
+    const referantOptions = ['<option value="">— aucun —</option>'].concat(
+      referants.map(r => `<option value="${r.id}" ${u.referentId===r.id?'selected':''}>${escapeHtml(r.firstname)} ${escapeHtml(r.lastname)}</option>`)
+    ).join('');
+
+    div.innerHTML = `
+      <div class="main">
+        <div class="entreprise">${escapeHtml(u.firstname)} ${escapeHtml(u.lastname)}</div>
+        <div class="meta">✉️ ${escapeHtml(u.email)} · 🎂 ${u.birthdate || '—'}</div>
+        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <span class="badge role-${u.role||'user'}">${u.role||'user'}</span>
+          ${u.banned ? '<span class="badge banned">banni</span>' : ''}
+          <label style="margin:0; font-size:12px;">Rôle :</label>
+          <select class="admin-select" onchange="window.setRole('${u.id}', this.value)">${roleOptions}</select>
+          <label style="margin:0; font-size:12px;">Référant :</label>
+          <select class="admin-select" onchange="window.setReferent('${u.id}', this.value)">${referantOptions}</select>
+        </div>
+      </div>
+      <div class="actions">
+        <button title="${u.banned?'Débannir':'Bannir'}" onclick="window.toggleBan('${u.id}', ${!!u.banned})">${u.banned?'✅':'⛔'}</button>
+        <button title="Supprimer les données" onclick="window.deleteUserData('${u.id}')">🗑️</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+window.setRole = async (uid, role) => {
+  await updateDoc(doc(db, "users", uid), { role });
+  loadAdmin();
+};
+
+window.setReferent = async (uid, referentId) => {
+  await updateDoc(doc(db, "users", uid), { referentId: referentId || null });
+  loadAdmin();
+};
+
+window.toggleBan = async (uid, currentlyBanned) => {
+  await updateDoc(doc(db, "users", uid), { banned: !currentlyBanned });
+  loadAdmin();
+};
+
+window.deleteUserData = async (uid) => {
+  if(!confirm("Supprimer toutes les données de ce compte (démarches + profil) ? L'accès Authentification devra être supprimé séparément dans la console Firebase.")) return;
+  const entriesSnap = await getDocs(query(collection(db, "entries"), where("userId","==", uid)));
+  for(const d of entriesSnap.docs){ await deleteDoc(d.ref); }
+  await deleteDoc(doc(db, "users", uid));
+  loadAdmin();
 };
