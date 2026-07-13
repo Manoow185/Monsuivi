@@ -87,6 +87,7 @@
 
   <!-- FORM -->
   <div class="card-form hidden" id="entryFormCard">
+    <h3 id="formTitle" style="margin-top:0;">Nouvelle démarche</h3>
     <div class="grid2">
       <div>
         <label>Nom de l'entreprise *</label>
@@ -95,6 +96,17 @@
       <div>
         <label>Téléphone de l'entreprise *</label>
         <input type="tel" id="fTelEntreprise" placeholder="06 12 34 56 78">
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <label>Date de la démarche *</label>
+        <input type="date" id="fDate">
+      </div>
+      <div>
+        <label>Heure de la démarche *</label>
+        <input type="time" id="fHeure">
       </div>
     </div>
 
@@ -143,7 +155,7 @@
     </fieldset>
 
     <div style="display:flex; gap:10px; margin-top:16px;">
-      <button class="btn-primary" id="saveEntryBtn" style="margin-top:0;">Enregistrer</button>
+      <button class="btn-primary" id="saveEntryBtn" style="margin-top:0;">💾 Enregistrer</button>
       <button class="btn-primary" id="cancelEntryBtn" style="margin-top:0; background:#ccc; color:#333; box-shadow:none;">Annuler</button>
     </div>
     <div class="error-msg" id="formError"></div>

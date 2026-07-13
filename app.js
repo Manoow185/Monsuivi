@@ -4,8 +4,8 @@ import {
   onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, doc, setDoc, addDoc, collection, query, where,
-  onSnapshot, deleteDoc, serverTimestamp, orderBy
+  getFirestore, doc, setDoc, addDoc, updateDoc, collection, query, where,
+  onSnapshot, deleteDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ⚠️ Remplace ces valeurs par celles de TON projet Firebase (Paramètres du projet > Config web)
@@ -115,12 +115,27 @@ const entryFormCard = document.getElementById('entryFormCard');
 const cancelEntryBtn = document.getElementById('cancelEntryBtn');
 const saveEntryBtn = document.getElementById('saveEntryBtn');
 
-showFormBtn.onclick = () => entryFormCard.classList.remove('hidden');
 cancelEntryBtn.onclick = () => { entryFormCard.classList.add('hidden'); clearForm(); };
 
+let editingId = null; // null = ajout, sinon id de la démarche en cours de modification
+
+function nowDateTime(){
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  };
+}
+
 function clearForm(){
+  editingId = null;
+  document.getElementById('formTitle').textContent = 'Nouvelle démarche';
   document.getElementById('fEntreprise').value = '';
   document.getElementById('fTelEntreprise').value = '';
+  const { date, time } = nowDateTime();
+  document.getElementById('fDate').value = date;
+  document.getElementById('fHeure').value = time;
   document.getElementById('fType').value = 'Dépôt de CV';
   document.getElementById('fReponse').value = 'En attente';
   document.getElementById('fRelance').value = 'Non';
@@ -130,9 +145,13 @@ function clearForm(){
   document.getElementById('formError').textContent = '';
 }
 
+showFormBtn.onclick = () => { clearForm(); entryFormCard.classList.remove('hidden'); };
+
 saveEntryBtn.onclick = async () => {
   const entreprise = document.getElementById('fEntreprise').value.trim();
   const telEntreprise = document.getElementById('fTelEntreprise').value.trim();
+  const date = document.getElementById('fDate').value;
+  const heure = document.getElementById('fHeure').value;
   const type = document.getElementById('fType').value;
   const reponse = document.getElementById('fReponse').value;
   const relance = document.getElementById('fRelance').value;
@@ -142,34 +161,64 @@ saveEntryBtn.onclick = async () => {
   const errEl = document.getElementById('formError');
   errEl.textContent = '';
 
-  if(!entreprise || !telEntreprise){
-    errEl.textContent = "Le nom et le téléphone de l'entreprise sont obligatoires.";
+  if(!entreprise || !telEntreprise || !date || !heure){
+    errEl.textContent = "Le nom, le téléphone, la date et l'heure sont obligatoires.";
     return;
   }
 
+  const data = {
+    userId: currentUserId,
+    entreprise, telEntreprise, date, heure, type, reponse, relance,
+    respNom, respTel, respEmail
+  };
+
   try{
-    await addDoc(collection(db, "entries"), {
-      userId: currentUserId,
-      entreprise, telEntreprise, type, reponse, relance,
-      respNom, respTel, respEmail,
-      createdAt: serverTimestamp()
-    });
+    if(editingId){
+      await updateDoc(doc(db, "entries", editingId), data);
+    } else {
+      data.createdAt = serverTimestamp();
+      await addDoc(collection(db, "entries"), data);
+    }
     entryFormCard.classList.add('hidden');
     clearForm();
   }catch(e){
-    errEl.textContent = "Erreur lors de l'enregistrement.";
+    errEl.textContent = "Erreur : " + (e.message || "l'enregistrement a échoué.");
     console.error(e);
   }
 };
 
+window.editEntry = (id, entries) => {
+  const e = entries.find(x => x.id === id);
+  if(!e) return;
+  editingId = id;
+  document.getElementById('formTitle').textContent = 'Modifier la démarche';
+  document.getElementById('fEntreprise').value = e.entreprise || '';
+  document.getElementById('fTelEntreprise').value = e.telEntreprise || '';
+  document.getElementById('fDate').value = e.date || nowDateTime().date;
+  document.getElementById('fHeure').value = e.heure || nowDateTime().time;
+  document.getElementById('fType').value = e.type || 'Dépôt de CV';
+  document.getElementById('fReponse').value = e.reponse || 'En attente';
+  document.getElementById('fRelance').value = e.relance || 'Non';
+  document.getElementById('fRespNom').value = e.respNom || '';
+  document.getElementById('fRespTel').value = e.respTel || '';
+  document.getElementById('fRespEmail').value = e.respEmail || '';
+  document.getElementById('formError').textContent = '';
+  entryFormCard.classList.remove('hidden');
+  entryFormCard.scrollIntoView({ behavior:'smooth', block:'start' });
+};
+
 // ---------- Listen & render entries ----------
 function listenEntries(){
-  const q = query(collection(db, "entries"), where("userId", "==", currentUserId), orderBy("createdAt", "desc"));
+  const q = query(collection(db, "entries"), where("userId", "==", currentUserId));
   unsubscribeEntries = onSnapshot(q, (snap) => {
     const entries = [];
     snap.forEach(d => entries.push({ id: d.id, ...d.data() }));
+    // Tri du plus récent au plus ancien selon date + heure de la démarche
+    entries.sort((a, b) => `${b.date||''} ${b.heure||''}`.localeCompare(`${a.date||''} ${a.heure||''}`));
     renderEntries(entries);
     renderStats(entries);
+  }, (error) => {
+    console.error("Erreur de lecture des démarches :", error);
   });
 }
 
@@ -178,12 +227,19 @@ function badgeClass(reponse){
   return map[reponse] || 'attente';
 }
 
-function formatWeek(ts){
-  if(!ts || !ts.toDate) return '';
-  const d = ts.toDate();
+function formatWeek(dateStr){
+  if(!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  if(isNaN(d)) return '';
   const firstJan = new Date(d.getFullYear(),0,1);
   const week = Math.ceil((((d - firstJan) / 86400000) + firstJan.getDay()+1)/7);
   return `Semaine ${week} - ${d.getFullYear()}`;
+}
+
+function formatDateFr(dateStr){
+  if(!dateStr) return '';
+  const [y,m,d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
 }
 
 function renderEntries(entries){
@@ -205,21 +261,23 @@ function renderEntries(entries){
     }
     div.innerHTML = `
       <div class="main">
-        <div class="week-tag">${formatWeek(e.createdAt)}</div>
+        <div class="week-tag">${formatWeek(e.date)}</div>
         <div class="entreprise">${escapeHtml(e.entreprise)}</div>
-        <div class="meta">📞 ${escapeHtml(e.telEntreprise)} · ${escapeHtml(e.type)}</div>
+        <div class="meta">📅 ${formatDateFr(e.date)} à ${escapeHtml(e.heure||'')} · 📞 ${escapeHtml(e.telEntreprise)} · ${escapeHtml(e.type)}</div>
         ${respLine}
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         <span class="badge ${badgeClass(e.reponse)}">${e.reponse}</span>
         <span class="badge ${e.relance==='Oui'?'relance-oui':'relance-non'}">Relance: ${e.relance}</span>
         <div class="actions">
+          <button title="Modifier" onclick='window.editEntry("${e.id}", window.__entries)'>✏️</button>
           <button title="Supprimer" onclick="window.deleteEntry('${e.id}')">🗑️</button>
         </div>
       </div>
     `;
     list.appendChild(div);
   });
+  window.__entries = entries;
 }
 
 function renderStats(entries){
