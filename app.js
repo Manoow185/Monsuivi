@@ -25,7 +25,7 @@ const db = getFirestore(app);
 const authScreen = document.getElementById('authScreen');
 const appScreen = document.getElementById('appScreen');
 const bannedScreen = document.getElementById('bannedScreen');
-const welcomeMsg = document.getElementById('welcomeMsg');
+const accountBtn = document.getElementById('accountBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 
 const tabLogin = document.getElementById('tabLogin');
@@ -95,7 +95,6 @@ let currentUserData = null;
 let unsubscribeEntries = null;
 
 const btnTabEntries = document.getElementById('btnTabEntries');
-const btnTabAccount = document.getElementById('btnTabAccount');
 const btnTabReferes = document.getElementById('btnTabReferes');
 const btnTabAdmin = document.getElementById('btnTabAdmin');
 const viewEntries = document.getElementById('viewEntries');
@@ -104,15 +103,15 @@ const viewReferes = document.getElementById('viewReferes');
 const viewAdmin = document.getElementById('viewAdmin');
 
 function switchView(view){
-  [btnTabEntries, btnTabAccount, btnTabReferes, btnTabAdmin].forEach(b => b.classList.remove('active'));
+  [btnTabEntries, btnTabReferes, btnTabAdmin].forEach(b => b.classList.remove('active'));
   [viewEntries, viewAccount, viewReferes, viewAdmin].forEach(v => v.classList.add('hidden'));
   if(view === 'entries'){ btnTabEntries.classList.add('active'); viewEntries.classList.remove('hidden'); }
-  if(view === 'account'){ btnTabAccount.classList.add('active'); viewAccount.classList.remove('hidden'); loadAccount(); }
+  if(view === 'account'){ viewAccount.classList.remove('hidden'); loadAccount(); }
   if(view === 'referes'){ btnTabReferes.classList.add('active'); viewReferes.classList.remove('hidden'); loadReferes(); }
   if(view === 'admin'){ btnTabAdmin.classList.add('active'); viewAdmin.classList.remove('hidden'); loadAdmin(); }
 }
 btnTabEntries.onclick = () => switchView('entries');
-btnTabAccount.onclick = () => switchView('account');
+accountBtn.onclick = () => switchView('account');
 btnTabReferes.onclick = () => switchView('referes');
 btnTabAdmin.onclick = () => switchView('admin');
 
@@ -139,7 +138,6 @@ document.getElementById('saveAccountBtn').onclick = async () => {
   try{
     await updateDoc(doc(db, "users", currentUserId), { firstname, lastname, birthdate, phone });
     currentUserData = { ...currentUserData, firstname, lastname, birthdate, phone };
-    welcomeMsg.textContent = `${firstname} (${currentUserData.email})`;
     msgEl.style.color = '#2EC4B6';
     msgEl.textContent = "Informations enregistrées ✅";
   }catch(e){
@@ -174,7 +172,6 @@ onAuthStateChanged(auth, async (user) => {
       appScreen.classList.add('hidden');
       bannedScreen.classList.remove('hidden');
       logoutBtn.classList.remove('hidden');
-      welcomeMsg.textContent = user.email;
       return;
     }
 
@@ -184,12 +181,17 @@ onAuthStateChanged(auth, async (user) => {
     bannedScreen.classList.add('hidden');
     appScreen.classList.remove('hidden');
     logoutBtn.classList.remove('hidden');
-    welcomeMsg.textContent = `${udata.firstname || ''} (${user.email})`;
+    accountBtn.classList.remove('hidden');
 
-    btnTabReferes.classList.toggle('hidden', udata.role !== 'referant');
-    btnTabAdmin.classList.toggle('hidden', udata.role !== 'admin');
-    switchView('entries');
-    listenEntries();
+    const isReferant = udata.role === 'referant';
+    const isAdmin = udata.role === 'admin';
+    btnTabEntries.classList.toggle('hidden', isReferant || isAdmin);
+    btnTabReferes.classList.toggle('hidden', !isReferant);
+    btnTabAdmin.classList.toggle('hidden', !isAdmin);
+
+    if(isAdmin) switchView('admin');
+    else if(isReferant) switchView('referes');
+    else { switchView('entries'); listenEntries(); }
   } else {
     currentUserId = null;
     currentUserData = null;
@@ -197,7 +199,7 @@ onAuthStateChanged(auth, async (user) => {
     appScreen.classList.add('hidden');
     bannedScreen.classList.add('hidden');
     logoutBtn.classList.add('hidden');
-    welcomeMsg.textContent = '';
+    accountBtn.classList.add('hidden');
     if(unsubscribeEntries) unsubscribeEntries();
   }
 });
@@ -412,6 +414,8 @@ window.deleteEntry = async (id) => {
 };
 
 // ---------- VUE REFERANT : mes référés ----------
+let referesUsersCache = [];
+
 async function loadReferes(){
   const container = document.getElementById('referesList');
   container.innerHTML = '<p class="meta">Chargement…</p>';
@@ -424,6 +428,7 @@ async function loadReferes(){
   }
   const users = [];
   usersSnap.forEach(d => users.push({ id:d.id, ...d.data() }));
+  referesUsersCache = users;
 
   if(users.length === 0){
     container.innerHTML = '<div class="empty-state"><div class="emoji">👥</div><p>Aucune personne ne t\'est encore affiliée.</p></div>';
@@ -431,31 +436,68 @@ async function loadReferes(){
   }
 
   container.innerHTML = '';
-  for(const u of users){
-    const entriesSnap = await getDocs(query(collection(db, "entries"), where("userId","==", u.id)));
-    const entries = [];
-    entriesSnap.forEach(d => entries.push({ id:d.id, ...d.data() }));
-    entries.sort((a,b) => `${b.date||''} ${b.heure||''}`.localeCompare(`${a.date||''} ${a.heure||''}`));
+  users.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.style.cursor = 'pointer';
+    div.innerHTML = `
+      <div class="main">
+        <div class="entreprise">${escapeHtml(u.firstname)} ${escapeHtml(u.lastname)}</div>
+        <div class="meta">✉️ ${escapeHtml(u.email)} · 🎂 ${u.birthdate || '—'} · 📞 ${escapeHtml(u.phone || '—')}</div>
+      </div>
+      <div><span class="badge role-referant">Voir les démarches →</span></div>
+    `;
+    div.onclick = () => openRefereeDetail(u);
+    container.appendChild(div);
+  });
+}
 
-    const block = document.createElement('div');
-    block.className = 'card-form';
-    block.innerHTML = `<h3 style="margin-top:0;">${escapeHtml(u.firstname)} ${escapeHtml(u.lastname)} <span class="meta">(${escapeHtml(u.email)})</span></h3>
-      <div class="meta" style="margin-bottom:10px;">🎂 Né(e) le ${u.birthdate || '—'} · 📞 ${escapeHtml(u.phone || '—')} · ${entries.length} démarche(s)</div>
-      <div class="entries" id="refEntries_${u.id}"></div>`;
-    container.appendChild(block);
-    renderEntries(entries, block.querySelector(`#refEntries_${u.id}`), null, false, true);
+let currentOpenReferee = null;
+
+async function openRefereeDetail(u){
+  currentOpenReferee = u;
+  const container = document.getElementById('referesList');
+  container.innerHTML = '<p class="meta">Chargement des démarches…</p>';
+  let entriesSnap;
+  try{
+    entriesSnap = await getDocs(query(collection(db, "entries"), where("userId","==", u.id)));
+  }catch(e){
+    container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><p>${escapeHtml(e.message||'Erreur de chargement.')}</p></div>`;
+    return;
   }
+  const entries = [];
+  entriesSnap.forEach(d => entries.push({ id:d.id, ...d.data() }));
+  entries.sort((a,b) => `${b.date||''} ${b.heure||''}`.localeCompare(`${a.date||''} ${a.heure||''}`));
+
+  container.innerHTML = `
+    <button class="btn-secondary" id="backToReferesBtn" style="margin-bottom:14px;">← Retour à mes référés</button>
+    <div class="card-form">
+      <h3 style="margin-top:0;">${escapeHtml(u.firstname)} ${escapeHtml(u.lastname)}</h3>
+      <div class="meta">✉️ ${escapeHtml(u.email)} · 🎂 ${u.birthdate || '—'} · 📞 ${escapeHtml(u.phone || '—')} · ${entries.length} démarche(s)</div>
+    </div>
+    <div class="entries" id="refEntriesDetail"></div>
+  `;
+  document.getElementById('backToReferesBtn').onclick = () => { currentOpenReferee = null; loadReferes(); };
+  renderEntries(entries, document.getElementById('refEntriesDetail'), null, false, true);
 }
 
 window.toggleSeen = async (id, currentlySeen) => {
-  await updateDoc(doc(db, "entries", id), { seen: !currentlySeen });
-  loadReferes();
+  try{
+    await updateDoc(doc(db, "entries", id), { seen: !currentlySeen });
+    if(currentOpenReferee) openRefereeDetail(currentOpenReferee);
+  }catch(e){
+    alert("Impossible de marquer comme vu : " + (e.message || "permissions insuffisantes. Vérifie les règles Firestore."));
+  }
 };
 
 window.saveReferantComment = async (id) => {
   const val = document.getElementById(`refComment_${id}`).value.trim();
-  await updateDoc(doc(db, "entries", id), { referantComment: val });
-  loadReferes();
+  try{
+    await updateDoc(doc(db, "entries", id), { referantComment: val });
+    if(currentOpenReferee) openRefereeDetail(currentOpenReferee);
+  }catch(e){
+    alert("Impossible d'enregistrer le commentaire : " + (e.message || "permissions insuffisantes."));
+  }
 };
 
 // ---------- VUE ADMIN ----------
