@@ -41,18 +41,19 @@ document.getElementById('signupBtn').onclick = async () => {
   const firstname = document.getElementById('signupFirstname').value.trim();
   const lastname = document.getElementById('signupLastname').value.trim();
   const birthdate = document.getElementById('signupBirthdate').value;
+  const phone = document.getElementById('signupPhone').value.trim();
   const email = document.getElementById('signupEmail').value.trim();
   const password = document.getElementById('signupPassword').value;
   const errEl = document.getElementById('signupError');
   errEl.textContent = '';
-  if(!firstname || !lastname || !birthdate || !email || !password){
+  if(!firstname || !lastname || !birthdate || !phone || !email || !password){
     errEl.textContent = "Merci de remplir tous les champs.";
     return;
   }
   try{
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await setDoc(doc(db, "users", cred.user.uid), {
-      firstname, lastname, birthdate, email,
+      firstname, lastname, birthdate, phone, email,
       role: "user", banned: false, referentId: null,
       createdAt: serverTimestamp()
     });
@@ -94,27 +95,75 @@ let currentUserData = null;
 let unsubscribeEntries = null;
 
 const btnTabEntries = document.getElementById('btnTabEntries');
+const btnTabAccount = document.getElementById('btnTabAccount');
 const btnTabReferes = document.getElementById('btnTabReferes');
 const btnTabAdmin = document.getElementById('btnTabAdmin');
 const viewEntries = document.getElementById('viewEntries');
+const viewAccount = document.getElementById('viewAccount');
 const viewReferes = document.getElementById('viewReferes');
 const viewAdmin = document.getElementById('viewAdmin');
 
 function switchView(view){
-  [btnTabEntries, btnTabReferes, btnTabAdmin].forEach(b => b.classList.remove('active'));
-  [viewEntries, viewReferes, viewAdmin].forEach(v => v.classList.add('hidden'));
+  [btnTabEntries, btnTabAccount, btnTabReferes, btnTabAdmin].forEach(b => b.classList.remove('active'));
+  [viewEntries, viewAccount, viewReferes, viewAdmin].forEach(v => v.classList.add('hidden'));
   if(view === 'entries'){ btnTabEntries.classList.add('active'); viewEntries.classList.remove('hidden'); }
+  if(view === 'account'){ btnTabAccount.classList.add('active'); viewAccount.classList.remove('hidden'); loadAccount(); }
   if(view === 'referes'){ btnTabReferes.classList.add('active'); viewReferes.classList.remove('hidden'); loadReferes(); }
   if(view === 'admin'){ btnTabAdmin.classList.add('active'); viewAdmin.classList.remove('hidden'); loadAdmin(); }
 }
 btnTabEntries.onclick = () => switchView('entries');
+btnTabAccount.onclick = () => switchView('account');
 btnTabReferes.onclick = () => switchView('referes');
 btnTabAdmin.onclick = () => switchView('admin');
 
+function loadAccount(){
+  document.getElementById('accFirstname').value = currentUserData.firstname || '';
+  document.getElementById('accLastname').value = currentUserData.lastname || '';
+  document.getElementById('accBirthdate').value = currentUserData.birthdate || '';
+  document.getElementById('accPhone').value = currentUserData.phone || '';
+  document.getElementById('accEmail').value = currentUserData.email || '';
+  document.getElementById('accountMsg').textContent = '';
+}
+
+document.getElementById('saveAccountBtn').onclick = async () => {
+  const firstname = document.getElementById('accFirstname').value.trim();
+  const lastname = document.getElementById('accLastname').value.trim();
+  const birthdate = document.getElementById('accBirthdate').value;
+  const phone = document.getElementById('accPhone').value.trim();
+  const msgEl = document.getElementById('accountMsg');
+  if(!firstname || !lastname || !birthdate || !phone){
+    msgEl.style.color = '#E63946';
+    msgEl.textContent = "Merci de remplir tous les champs.";
+    return;
+  }
+  try{
+    await updateDoc(doc(db, "users", currentUserId), { firstname, lastname, birthdate, phone });
+    currentUserData = { ...currentUserData, firstname, lastname, birthdate, phone };
+    welcomeMsg.textContent = `${firstname} (${currentUserData.email})`;
+    msgEl.style.color = '#2EC4B6';
+    msgEl.textContent = "Informations enregistrées ✅";
+  }catch(e){
+    msgEl.style.color = '#E63946';
+    msgEl.textContent = "Erreur lors de l'enregistrement.";
+  }
+};
+
 onAuthStateChanged(auth, async (user) => {
   if(user){
-    const snap = await getDoc(doc(db, "users", user.uid));
-    const udata = snap.exists() ? snap.data() : { role:'user', banned:false };
+    const uRef = doc(db, "users", user.uid);
+    const snap = await getDoc(uRef);
+    let udata = snap.exists() ? snap.data() : {};
+
+    // Auto-réparation : crée les champs manquants (utile pour les comptes créés avant l'ajout des rôles)
+    const patch = {};
+    if(udata.role === undefined) patch.role = 'user';
+    if(udata.banned === undefined) patch.banned = false;
+    if(udata.referentId === undefined) patch.referentId = null;
+    if(udata.phone === undefined) patch.phone = '';
+    if(Object.keys(patch).length > 0){
+      await setDoc(uRef, patch, { merge: true });
+      udata = { ...udata, ...patch };
+    }
 
     if(udata.banned){
       authScreen.classList.add('hidden');
@@ -381,7 +430,7 @@ async function loadReferes(){
     const block = document.createElement('div');
     block.className = 'card-form';
     block.innerHTML = `<h3 style="margin-top:0;">${escapeHtml(u.firstname)} ${escapeHtml(u.lastname)} <span class="meta">(${escapeHtml(u.email)})</span></h3>
-      <div class="meta" style="margin-bottom:10px;">🎂 Né(e) le ${u.birthdate || '—'} · ${entries.length} démarche(s)</div>
+      <div class="meta" style="margin-bottom:10px;">🎂 Né(e) le ${u.birthdate || '—'} · 📞 ${escapeHtml(u.phone || '—')} · ${entries.length} démarche(s)</div>
       <div class="entries" id="refEntries_${u.id}"></div>`;
     container.appendChild(block);
     renderEntries(entries, block.querySelector(`#refEntries_${u.id}`), null, false, true);
@@ -421,7 +470,7 @@ async function loadAdmin(){
     div.innerHTML = `
       <div class="main">
         <div class="entreprise">${escapeHtml(u.firstname)} ${escapeHtml(u.lastname)}</div>
-        <div class="meta">✉️ ${escapeHtml(u.email)} · 🎂 ${u.birthdate || '—'}</div>
+        <div class="meta">✉️ ${escapeHtml(u.email)} · 🎂 ${u.birthdate || '—'} · 📞 ${escapeHtml(u.phone || '—')}</div>
         <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
           <span class="badge role-${u.role||'user'}">${u.role||'user'}</span>
           ${u.banned ? '<span class="badge banned">banni</span>' : ''}

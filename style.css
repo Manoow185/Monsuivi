@@ -179,3 +179,5 @@ textarea:focus{outline:none; border-color:var(--orange);}
 .comment-box.user-comment{background:#FFF3EA; border-left-color:var(--orange);}
 .badge.seen{background:var(--green);}
 .badge.unseen{background:#ccc; color:#555;}
+
+.logo-img{height:36px; width:auto; border-radius:8px;}

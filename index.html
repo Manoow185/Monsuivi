@@ -10,12 +10,7 @@
 
 <header>
   <div class="brand">
-    <svg width="34" height="34" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="4" y="14" width="40" height="28" rx="6" fill="#FFC542"/>
-      <rect x="16" y="6" width="16" height="12" rx="3" fill="#FF7A45"/>
-      <rect x="4" y="22" width="40" height="6" fill="#7C5CFC"/>
-      <circle cx="24" cy="30" r="4" fill="#2EC4B6"/>
-    </svg>
+    <img src="logo.png" alt="JobTrack" class="logo-img">
     <h1>JobTrack</h1>
   </div>
   <div class="userbox">
@@ -49,6 +44,8 @@
     </div>
     <label>Date de naissance</label>
     <input type="date" id="signupBirthdate">
+    <label>Numéro de téléphone</label>
+    <input type="tel" id="signupPhone" placeholder="06 12 34 56 78">
     <label>Email</label>
     <input type="email" id="signupEmail">
     <label>Mot de passe (6 caractères min.)</label>
@@ -71,6 +68,7 @@
 
   <div class="nav-tabs" id="navTabs">
     <button class="nav-tab active" id="btnTabEntries">📋 Mes démarches</button>
+    <button class="nav-tab" id="btnTabAccount">👤 Mon compte</button>
     <button class="nav-tab hidden" id="btnTabReferes">👥 Mes référés</button>
     <button class="nav-tab hidden" id="btnTabAdmin">🛠️ Administration</button>
   </div>
@@ -146,6 +144,25 @@
     <div class="empty-state hidden" id="emptyState">
       <div class="emoji">🗂️</div>
       <p>Aucune démarche enregistrée pour le moment.<br>Clique sur "+ Ajouter" pour commencer !</p>
+    </div>
+  </div>
+
+  <!-- VUE : MON COMPTE -->
+  <div id="viewAccount" class="hidden">
+    <div class="section-title"><h2>👤 Mon compte</h2></div>
+    <div class="card-form">
+      <div class="grid2">
+        <div><label>Prénom</label><input type="text" id="accFirstname"></div>
+        <div><label>Nom</label><input type="text" id="accLastname"></div>
+      </div>
+      <div class="grid2">
+        <div><label>Date de naissance</label><input type="date" id="accBirthdate"></div>
+        <div><label>Numéro de téléphone</label><input type="tel" id="accPhone"></div>
+      </div>
+      <label>Email</label>
+      <input type="email" id="accEmail" disabled>
+      <button class="btn-primary" id="saveAccountBtn">💾 Enregistrer mes informations</button>
+      <div class="error-msg" id="accountMsg"></div>
     </div>
   </div>
 
