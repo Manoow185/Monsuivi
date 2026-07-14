@@ -149,6 +149,10 @@ document.getElementById('saveAccountBtn').onclick = async () => {
 };
 
 onAuthStateChanged(auth, async (user) => {
+  // On masque immédiatement les onglets sensibles tant que le rôle n'est pas confirmé
+  btnTabReferes.classList.add('hidden');
+  btnTabAdmin.classList.add('hidden');
+
   if(user){
     const uRef = doc(db, "users", user.uid);
     const snap = await getDoc(uRef);
@@ -411,7 +415,13 @@ window.deleteEntry = async (id) => {
 async function loadReferes(){
   const container = document.getElementById('referesList');
   container.innerHTML = '<p class="meta">Chargement…</p>';
-  const usersSnap = await getDocs(query(collection(db, "users"), where("referentId","==", currentUserId)));
+  let usersSnap;
+  try{
+    usersSnap = await getDocs(query(collection(db, "users"), where("referentId","==", currentUserId)));
+  }catch(e){
+    container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><p>Impossible de charger tes référés.<br><span class="meta">${escapeHtml(e.message||'Permissions insuffisantes.')}</span></p></div>`;
+    return;
+  }
   const users = [];
   usersSnap.forEach(d => users.push({ id:d.id, ...d.data() }));
 
@@ -452,7 +462,13 @@ window.saveReferantComment = async (id) => {
 async function loadAdmin(){
   const container = document.getElementById('adminList');
   container.innerHTML = '<p class="meta">Chargement…</p>';
-  const usersSnap = await getDocs(collection(db, "users"));
+  let usersSnap;
+  try{
+    usersSnap = await getDocs(collection(db, "users"));
+  }catch(e){
+    container.innerHTML = `<div class="empty-state"><div class="emoji">⚠️</div><p>Impossible de charger les comptes.<br><span class="meta">${escapeHtml(e.message||'Permissions insuffisantes.')}</span><br>Vérifie que ton compte a bien le rôle "admin" et que les règles Firestore sont à jour.</p></div>`;
+    return;
+  }
   const users = [];
   usersSnap.forEach(d => users.push({ id:d.id, ...d.data() }));
   const referants = users.filter(u => u.role === 'referant');
